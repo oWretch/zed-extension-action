@@ -9,6 +9,8 @@ inputs:
     description: The name of the Zed Extension (defaults to lower-cased repository name)
   extension-path:
     description: The path to the Zed Extension in zed/extensions repo (defaults to `extensions/<extension-name>`)
+  version:
+    description: The specific version to use for the extension bump. If provided, this will override the `tag-name` input and the default tag detection.
   tag-name:
     description: The git tag name to bump the formula to (defaults to the currently pushed tag)
   commit-message:

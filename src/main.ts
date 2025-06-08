@@ -20,12 +20,21 @@ export async function prepareEdit(
   _sameRepoClient: API,
   crossRepoClient: API,
 ): Promise<EditOptions> {
-  const tagName =
-    getInput("tag-name") ||
-    ((ref) => {
-      if (!ref.startsWith("refs/tags/")) throw `invalid ref: ${ref}`;
-      return ref.replace("refs/tags/", "");
-    })(context.ref);
+  // Check for version input first, otherwise fall back to tag-name logic
+  const versionInput = getInput("version");
+  let version: string;
+  
+  if (versionInput) {
+    version = versionInput;
+  } else {
+    const tagName =
+      getInput("tag-name") ||
+      ((ref) => {
+        if (!ref.startsWith("refs/tags/")) throw `invalid ref: ${ref}`;
+        return ref.replace("refs/tags/", "");
+      })(context.ref);
+    version = tagName.replace(/^v(\d)/, "$1");
+  }
 
   const [owner, repo] = getInput("zed-extensions", { required: true }).split(
     "/",
@@ -51,7 +60,6 @@ export async function prepareEdit(
   const branch = getInput("base-branch");
   const extensionPath =
     getInput("extension-path") || getExtensionPath(extensionName);
-  const version = tagName.replace(/^v(\d)/, "$1");
 
   const messageTemplate = getInput("commit-message", { required: true });
 
