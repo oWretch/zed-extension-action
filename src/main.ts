@@ -21,36 +21,22 @@ export async function prepareEdit(
   sameRepoClient: API,
   crossRepoClient: API,
 ): Promise<EditOptions> {
-  // Get the git reference to use
-  const inputRef = getInput("ref");
+  // Get the tag to use
+  const inputTag = getInput("tag");
   let resolvedSha: string;
   let tagName: string;
 
-  if (inputRef) {
-    // Use the provided ref parameter
+  if (inputTag) {
+    // Use the provided tag parameter
+    tagName = inputTag;
+    // Resolve the tag to get the commit SHA
     const resolved = await resolveRef(
       sameRepoClient,
       context.repo.owner,
       context.repo.repo,
-      inputRef,
+      tagName,
     );
     resolvedSha = resolved.sha;
-
-    // Extract tag name from the reference
-    if (resolved.type === 'tag') {
-      if (inputRef.startsWith('refs/tags/')) {
-        tagName = inputRef.replace('refs/tags/', '');
-      } else {
-        tagName = inputRef;
-      }
-    } else {
-      // For non-tag references, use tag-name input or throw error
-      const inputTagName = getInput("tag-name");
-      if (!inputTagName) {
-        throw new Error(`When using a non-tag reference (${inputRef}), you must provide tag-name input`);
-      }
-      tagName = inputTagName;
-    }
   } else {
     // Use existing logic for backward compatibility
     const inputTagName = getInput("tag-name");
@@ -61,13 +47,13 @@ export async function prepareEdit(
         sameRepoClient,
         context.repo.owner,
         context.repo.repo,
-        `refs/tags/${tagName}`,
+        tagName,
       );
       resolvedSha = resolved.sha;
     } else {
       // Fall back to context.ref and context.sha
       if (!context.ref.startsWith("refs/tags/")) {
-        throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no ref or tag-name is provided.`);
+        throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no tag or tag-name is provided.`);
       }
       tagName = context.ref.replace("refs/tags/", "");
       resolvedSha = context.sha;
