@@ -41,6 +41,75 @@ export default function (
   });
 }
 
+/**
+ * Resolve a git reference to its commit SHA
+ * Handles various reference formats:
+ * - Tag names: "v1.0.0" or "refs/tags/v1.0.0"
+ * - Branch names: "main" or "refs/heads/main"
+ * - Commit SHAs: "abc123..."
+ * - Full refs: "refs/heads/feature-branch"
+ */
+export async function resolveRef(
+  octokit: API,
+  owner: string,
+  repo: string,
+  ref: string,
+): Promise<{ sha: string; type: 'tag' | 'branch' | 'commit' }> {
+  // If it looks like a commit SHA (7+ hex chars), try to validate it directly
+  if (/^[a-f0-9]{7,40}$/i.test(ref)) {
+    try {
+      const { data } = await octokit.request("GET /repos/{owner}/{repo}/commits/{ref}", {
+        owner,
+        repo,
+        ref,
+      });
+      return { sha: data.sha, type: 'commit' };
+    } catch (error) {
+      throw new Error(`Invalid commit SHA: ${ref}`);
+    }
+  }
+
+  // Handle full refs directly
+  if (ref.startsWith('refs/')) {
+    const refType = ref.startsWith('refs/tags/') ? 'tag' : 'branch';
+    const refPath = ref.replace('refs/', '');
+    
+    try {
+      const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/refs/{ref}", {
+        owner,
+        repo,
+        ref: refPath,
+      });
+      return { sha: data.object.sha, type: refType };
+    } catch (error) {
+      throw new Error(`Reference not found: ${ref}`);
+    }
+  }
+
+  // For bare names, try to determine if it's a tag or branch by checking both
+  // First try as a tag
+  try {
+    const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/refs/{ref}", {
+      owner,
+      repo,
+      ref: `tags/${ref}`,
+    });
+    return { sha: data.object.sha, type: 'tag' };
+  } catch (tagError) {
+    // Not a tag, try as a branch
+    try {
+      const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/refs/{ref}", {
+        owner,
+        repo,
+        ref: `heads/${ref}`,
+      });
+      return { sha: data.object.sha, type: 'branch' };
+    } catch (branchError) {
+      throw new Error(`Reference not found: ${ref}. Not a valid tag, branch, or commit.`);
+    }
+  }
+}
+
 export async function createCommit(
   octokit: API,
   owner: string,

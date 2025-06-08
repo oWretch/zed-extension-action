@@ -1,5 +1,6 @@
 import { getInput, getBooleanInput, isDebug } from "@actions/core";
 import type { API } from "./github";
+import { resolveRef } from "./github";
 import editGitHubBlob from "./edit_github_blob";
 import { EditOptions } from "./edit_github_blob";
 import { removeRevisionLine, updateVersion } from "./replace_extension_toml";
@@ -17,15 +18,61 @@ export default async function (api: (token: string) => API): Promise<void> {
 }
 
 export async function prepareEdit(
-  _sameRepoClient: API,
+  sameRepoClient: API,
   crossRepoClient: API,
 ): Promise<EditOptions> {
-  const tagName =
-    getInput("tag-name") ||
-    ((ref) => {
-      if (!ref.startsWith("refs/tags/")) throw `invalid ref: ${ref}`;
-      return ref.replace("refs/tags/", "");
-    })(context.ref);
+  // Get the git reference to use
+  const inputRef = getInput("ref");
+  let resolvedSha: string;
+  let tagName: string;
+
+  if (inputRef) {
+    // Use the provided ref parameter
+    const resolved = await resolveRef(
+      sameRepoClient,
+      context.repo.owner,
+      context.repo.repo,
+      inputRef,
+    );
+    resolvedSha = resolved.sha;
+
+    // Extract tag name from the reference
+    if (resolved.type === 'tag') {
+      if (inputRef.startsWith('refs/tags/')) {
+        tagName = inputRef.replace('refs/tags/', '');
+      } else {
+        tagName = inputRef;
+      }
+    } else {
+      // For non-tag references, use tag-name input or throw error
+      const inputTagName = getInput("tag-name");
+      if (!inputTagName) {
+        throw new Error(`When using a non-tag reference (${inputRef}), you must provide tag-name input`);
+      }
+      tagName = inputTagName;
+    }
+  } else {
+    // Use existing logic for backward compatibility
+    const inputTagName = getInput("tag-name");
+    if (inputTagName) {
+      tagName = inputTagName;
+      // Resolve the tag to get the commit SHA
+      const resolved = await resolveRef(
+        sameRepoClient,
+        context.repo.owner,
+        context.repo.repo,
+        `refs/tags/${tagName}`,
+      );
+      resolvedSha = resolved.sha;
+    } else {
+      // Fall back to context.ref and context.sha
+      if (!context.ref.startsWith("refs/tags/")) {
+        throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no ref or tag-name is provided.`);
+      }
+      tagName = context.ref.replace("refs/tags/", "");
+      resolvedSha = context.sha;
+    }
+  }
 
   const [owner, repo] = getInput("zed-extensions", { required: true }).split(
     "/",
@@ -83,7 +130,7 @@ export async function prepareEdit(
     commitMessage,
     pushTo,
     makePR,
-    submoduleCommitSha: context.sha,
+    submoduleCommitSha: resolvedSha,
     replace(oldContent: string) {
       return removeRevisionLine(
         updateVersion(oldContent, extensionName, version),
