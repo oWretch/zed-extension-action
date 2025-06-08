@@ -35,7 +35,6 @@ jobs:
 | `extension-path` | If you have a different path, you can set it.                | `false`  | `extensions/${ extension-name }` |
 | `push-to`        | The forked repository of the zed-industries/extensions repo. | `true`   | -                                |
 | `tag`            | Git tag name to use for the extension update                | `false`  | Currently pushed tag             |
-| `tag-name`       | The git tag name to bump the formula to                     | `false`  | Extracted from tag or current tag |
 
 ### Tag Support
 

@@ -38,26 +38,12 @@ export async function prepareEdit(
     );
     resolvedSha = resolved.sha;
   } else {
-    // Use existing logic for backward compatibility
-    const inputTagName = getInput("tag-name");
-    if (inputTagName) {
-      tagName = inputTagName;
-      // Resolve the tag to get the commit SHA
-      const resolved = await resolveRef(
-        sameRepoClient,
-        context.repo.owner,
-        context.repo.repo,
-        tagName,
-      );
-      resolvedSha = resolved.sha;
-    } else {
-      // Fall back to context.ref and context.sha
-      if (!context.ref.startsWith("refs/tags/")) {
-        throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no tag or tag-name is provided.`);
-      }
-      tagName = context.ref.replace("refs/tags/", "");
-      resolvedSha = context.sha;
+    // Fall back to context.ref and context.sha
+    if (!context.ref.startsWith("refs/tags/")) {
+      throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no tag is provided.`);
     }
+    tagName = context.ref.replace("refs/tags/", "");
+    resolvedSha = context.sha;
   }
 
   const [owner, repo] = getInput("zed-extensions", { required: true }).split(
