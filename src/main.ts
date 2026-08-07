@@ -21,15 +21,12 @@ export async function prepareEdit(
   sameRepoClient: API,
   crossRepoClient: API,
 ): Promise<EditOptions> {
-  // Get the tag to use
   const inputTag = getInput("tag");
   let resolvedSha: string;
   let tagName: string;
 
   if (inputTag) {
-    // Use the provided tag parameter
     tagName = inputTag;
-    // Resolve the tag to get the commit SHA
     const resolved = await resolveRef(
       sameRepoClient,
       context.repo.owner,
@@ -38,7 +35,6 @@ export async function prepareEdit(
     );
     resolvedSha = resolved.sha;
   } else {
-    // Fall back to context.ref and context.sha
     if (!context.ref.startsWith("refs/tags/")) {
       throw new Error(`invalid ref: ${context.ref}. Expected a tag reference when no tag is provided.`);
     }
