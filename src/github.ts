@@ -51,31 +51,37 @@ export async function resolveRef(
   repo: string,
   tag: string,
 ): Promise<{ sha: string; type: 'tag' }> {
-  // Handle full tag refs
-  if (tag.startsWith('refs/tags/')) {
-    const tagName = tag.replace('refs/tags/', '');
-    
-    try {
-      const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/refs/{ref}", {
+  const tagName = tag.replace(/^refs\/tags\//, "");
+
+  try {
+    const { data: ref } = await octokit.request(
+      "GET /repos/{owner}/{repo}/git/refs/{ref}",
+      {
         owner,
         repo,
         ref: `tags/${tagName}`,
-      });
-      return { sha: data.object.sha, type: 'tag' };
-    } catch (error) {
-      throw new Error(`Tag not found: ${tag}`);
-    }
-  }
+      },
+    );
 
-  // For bare tag names, look up as tag
-  try {
-    const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/refs/{ref}", {
-      owner,
-      repo,
-      ref: `tags/${tag}`,
-    });
-    return { sha: data.object.sha, type: 'tag' };
-  } catch (error) {
+    if (ref.object.type === "commit") {
+      return { sha: ref.object.sha, type: "tag" };
+    }
+
+    const { data: tagObject } = await octokit.request(
+      "GET /repos/{owner}/{repo}/git/tags/{tag_sha}",
+      {
+        owner,
+        repo,
+        tag_sha: ref.object.sha,
+      },
+    );
+
+    if (tagObject.object.type !== "commit") {
+      throw new Error(`Tag ${tag} does not point to a commit`);
+    }
+
+    return { sha: tagObject.object.sha, type: "tag" };
+  } catch {
     throw new Error(`Tag not found: ${tag}`);
   }
 }
